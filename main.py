@@ -9,37 +9,58 @@ import machine
 from m5stack import lcd, btnA, btnB, btnC, speaker
 from m5ui import setScreenColor, M5TextBox, M5Rect
 
+# ─────────────────────────────────────────────
+#  USER CONFIGURATION  (edit these values)
+# ─────────────────────────────────────────────
 WIFI_SSID     = "YOUR_WIFI_SSID"
 WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
 
+# Alarm time (24-hour)
 ALARM_HOUR   = 7
 ALARM_MINUTE = 0
 
+# Timezone offset from UTC in hours (e.g. -5 for EST, -6 for CST)
 TZ_OFFSET_HOURS = -5
 
+# Weather — OpenWeatherMap free API
 OWM_API_KEY = "YOUR_OPENWEATHERMAP_API_KEY"
-OWM_CITY    = "Indianapolis,US"
+OWM_CITY    = "Indianapolis,US"   # or use lat/lon below
+# OWM_LAT   = 39.9784
+# OWM_LON   = -86.1180
 
+# Google Calendar — public ICS feed URL (File > Settings > Get shareable link, choose ICS)
+# For private calendars, generate a secret address in Calendar settings
 GCAL_ICS_URL = "https://calendar.google.com/calendar/ical/YOUR_CALENDAR_ID/basic.ics"
 
-RADIO_STATION_1_URL  = "http://ice1.somafm.com/groovesalad-128-mp3"
+# Radio streams (MP3 / AAC internet radio URLs)
+RADIO_STATION_1_URL  = "http://ice1.somafm.com/groovesalad-128-mp3"   # SomaFM Groove Salad
 RADIO_STATION_1_NAME = "Groove Salad"
-RADIO_STATION_2_URL  = "http://ice1.somafm.com/seventies-128-mp3"
+RADIO_STATION_2_URL  = "http://ice1.somafm.com/seventies-128-mp3"      # SomaFM 70s Hits
 RADIO_STATION_2_NAME = "70s Hits"
 
-ALARM_AUDIO_FILE = "/sd/alarm.wav"
+# Alarm audio — path to a .wav file on the SD card, or use buzzer tones
+# Set to None to use the built-in buzzer melody instead
+ALARM_AUDIO_FILE = "/sd/alarm.wav"   # None = buzzer
 
+# Snooze duration in minutes
 SNOOZE_MINUTES = 9
 
-TTS_SERVICE = "google"
+# TTS service: "google" (free, needs internet) or "espeak" (offline, lower quality)
+TTS_SERVICE = "google"   # only "google" implemented here
 
+# ─────────────────────────────────────────────
+#  GLOBALS
+# ─────────────────────────────────────────────
 wlan          = None
 alarm_active  = False
-radio_playing = None
-snooze_until  = None
+radio_playing = None   # None | 1 | 2
+snooze_until  = None   # utime.time() value
 weather_text  = ""
 calendar_text = ""
 
+# ─────────────────────────────────────────────
+#  WIFI
+# ─────────────────────────────────────────────
 def connect_wifi():
     global wlan
     wlan = network.WLAN(network.STA_IF)
@@ -56,9 +77,12 @@ def connect_wifi():
     else:
         lcd_status("WiFi FAILED — offline mode")
 
+# ─────────────────────────────────────────────
+#  NTP / CLOCK
+# ─────────────────────────────────────────────
 def sync_time():
     try:
-        ntptime.settime()
+        ntptime.settime()   # sets RTC to UTC
         lcd_status("Time synced (NTP)")
     except Exception as e:
         lcd_status("NTP sync failed: " + str(e))
@@ -79,6 +103,9 @@ def date_str():
               "Jul","Aug","Sep","Oct","Nov","Dec"]
     return "{} {} {}".format(days[lt[6]], lt[2], months[lt[1]])
 
+# ─────────────────────────────────────────────
+#  WEATHER
+# ─────────────────────────────────────────────
 def fetch_weather():
     global weather_text
     try:
@@ -102,6 +129,9 @@ def fetch_weather():
         weather_text = "Weather unavailable."
         lcd_status("Weather error: " + str(e))
 
+# ─────────────────────────────────────────────
+#  GOOGLE CALENDAR (ICS parser — minimal)
+# ─────────────────────────────────────────────
 def fetch_calendar():
     global calendar_text
     try:
@@ -112,7 +142,7 @@ def fetch_calendar():
         if events:
             parts = ["You have {} event{} today. ".format(
                 len(events), "s" if len(events) > 1 else "")]
-            for ev in events[:5]:
+            for ev in events[:5]:   # speak max 5 events
                 parts.append(ev)
             calendar_text = " ".join(parts)
         else:
@@ -138,10 +168,12 @@ def parse_ics_today(ics_text):
             dtstart  = ""
         elif line == "END:VEVENT":
             if in_event and today in dtstart:
+                # Extract HH:MM from dtstart like 20240513T090000Z
                 try:
                     t_part = dtstart.split("T")[1][:4]
                     h = t_part[:2]
                     m = t_part[2:]
+                    # Adjust for TZ (rough)
                     hour = (int(h) + TZ_OFFSET_HOURS) % 24
                     events.append("{} at {:02d}:{}.".format(summary, hour, m))
                 except Exception:
@@ -154,6 +186,9 @@ def parse_ics_today(ics_text):
                 dtstart = line.split(":")[-1]
     return events
 
+# ─────────────────────────────────────────────
+#  TEXT-TO-SPEECH  (Google Translate TTS)
+# ─────────────────────────────────────────────
 def tts_speak(text):
     """
     Streams Google Translate TTS audio to the M5Stack speaker.
@@ -171,7 +206,8 @@ def tts_speak(text):
                           .replace(".", "%2E").replace("'", "%27")
             url = ("http://translate.google.com/translate_tts"
                    "?ie=UTF-8&client=tw-ob&tl=en&q={}".format(encoded))
-            speaker.playCloudMP3(url)
+            # Stream audio bytes to speaker
+            speaker.playCloudMP3(url)      # UIFlow built-in cloud MP3 player
             utime.sleep_ms(300)
         except Exception as e:
             lcd_status("TTS err: " + str(e))
@@ -190,6 +226,9 @@ def split_text(text, max_len):
         chunks.append(cur)
     return chunks
 
+# ─────────────────────────────────────────────
+#  MORNING BRIEFING
+# ─────────────────────────────────────────────
 def morning_briefing():
     lcd_status("Fetching briefing…")
     fetch_weather()
@@ -215,12 +254,16 @@ def morning_briefing():
     tts_speak(script)
     lcd_status("Briefing done.")
 
+# ─────────────────────────────────────────────
+#  ALARM
+# ─────────────────────────────────────────────
 def check_alarm():
     global alarm_active, snooze_until
     if alarm_active:
         return
     lt  = local_time()
     now = utime.time()
+    # Check snooze
     if snooze_until and now < snooze_until:
         return
     snooze_until = None
@@ -247,6 +290,7 @@ def play_alarm_sound():
             return
         except Exception:
             pass
+    # Fallback: buzzer melody
     notes = [659, 659, 0, 659, 0, 523, 659, 0, 784]
     for n in notes:
         if n:
@@ -265,8 +309,11 @@ def dismiss_alarm():
     alarm_active = False
     snooze_until = None
     speaker.stop()
-    morning_briefing()
+    morning_briefing()   # speak the morning summary after dismissing
 
+# ─────────────────────────────────────────────
+#  RADIO
+# ─────────────────────────────────────────────
 def play_radio(station):
     global radio_playing
     stop_radio()
@@ -294,29 +341,38 @@ def toggle_radio(station):
     else:
         play_radio(station)
 
+# ─────────────────────────────────────────────
+#  DISPLAY
+# ─────────────────────────────────────────────
 def draw_clock_face():
     if alarm_active:
         return
     lcd.clear()
+    # Time
     lcd.font(lcd.FONT_DejaVu40)
     lcd.setTextColor(lcd.WHITE)
     lcd.text(lcd.CENTER, 10, time_str())
+    # Date
     lcd.font(lcd.FONT_DejaVu18)
     lcd.setTextColor(lcd.CYAN)
     lcd.text(lcd.CENTER, 65, date_str())
+    # Alarm indicator
     lcd.font(lcd.FONT_Default)
     lcd.setTextColor(lcd.YELLOW)
     lcd.text(lcd.CENTER, 100,
              "Alarm {:02d}:{:02d}".format(ALARM_HOUR, ALARM_MINUTE))
+    # Radio status
     if radio_playing:
         name = RADIO_STATION_1_NAME if radio_playing == 1 else RADIO_STATION_2_NAME
         lcd.setTextColor(lcd.GREEN)
         lcd.text(lcd.CENTER, 125, "♫ " + name)
+    # Snooze indicator
     global snooze_until
     if snooze_until:
         remaining = max(0, snooze_until - utime.time()) // 60
         lcd.setTextColor(lcd.ORANGE)
         lcd.text(lcd.CENTER, 150, "Snooze: {}min left".format(remaining))
+    # Button hints
     lcd.setTextColor(0x888888)
     lcd.font(lcd.FONT_Default)
     lcd.text(10,   220, "Radio1")
@@ -324,13 +380,17 @@ def draw_clock_face():
     lcd.text(245,  220, "Brief")
 
 def lcd_status(msg):
-    print(msg)
+    print(msg)   # also to serial console
     if not alarm_active:
         lcd.font(lcd.FONT_Default)
         lcd.setTextColor(lcd.WHITE)
+        # Print in status bar area
         lcd.rect(0, 195, 320, 20, lcd.BLACK, lcd.BLACK)
         lcd.text(5, 197, msg[:50])
 
+# ─────────────────────────────────────────────
+#  BUTTON HANDLERS
+# ─────────────────────────────────────────────
 def on_btn_a():
     if alarm_active:
         snooze_alarm()
@@ -347,8 +407,12 @@ def on_btn_c():
     if alarm_active:
         dismiss_alarm()
     else:
+        # Long-press or single press → morning briefing on demand
         morning_briefing()
 
+# ─────────────────────────────────────────────
+#  MAIN LOOP
+# ─────────────────────────────────────────────
 def main():
     setScreenColor(0x000000)
     lcd.clear()
@@ -368,14 +432,17 @@ def main():
     while True:
         now = utime.ticks_ms()
 
+        # Redraw clock every second
         if utime.ticks_diff(now, last_clock_draw) >= 1000:
             draw_clock_face()
             last_clock_draw = now
 
+        # Check alarm every 30 seconds
         if utime.ticks_diff(now, last_alarm_check) >= 30000:
             check_alarm()
             last_alarm_check = now
 
+        # Keep alarm sound looping while active
         if alarm_active:
             play_alarm_sound()
             utime.sleep_ms(2000)
