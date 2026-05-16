@@ -1,7 +1,3 @@
-"""
-M5Stack Fire Alarm Clock - Fixed for UIFlow v1.8
-"""
-
 from m5stack import *
 from m5ui import *
 from uiflow import *
