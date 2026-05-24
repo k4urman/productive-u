@@ -1,6 +1,6 @@
-# World's Greatest Clock
+# Productive-U
 
-A smart alarm clock for the **M5Stack Fire** (ESP32).
+A smart device for the **M5Stack Fire** (ESP32).
 
 ---
 
