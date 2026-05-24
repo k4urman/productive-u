@@ -1,3 +1,4 @@
+# Deprecated: use agent_server.py for Productive-U. Kept for /speak TTS only.
 import io
 import os
 import socket

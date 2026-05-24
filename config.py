@@ -3,93 +3,95 @@ WIFI_SSID     = "YOUR_WIFI_SSID"
 WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
 
 # ── Timezone & DST ───────────────────────────────────────
-# Base UTC offset WITHOUT DST (standard time)
 TZ_UTC_OFFSET  = -5   # EST=-5, CST=-6, MST=-7, PST=-8
 
-# DST rule — US default (2nd Sun Mar → 1st Sun Nov, +1 hr)
 DST_ENABLED    = True
-DST_START_MONTH  = 3    # March
-DST_START_WEEK   = 2    # 2nd Sunday
-DST_END_MONTH    = 11   # November
-DST_END_WEEK     = 1    # 1st Sunday
-DST_OFFSET       = 1    # hours to add during DST
+DST_START_MONTH  = 3
+DST_START_WEEK   = 2
+DST_END_MONTH    = 11
+DST_END_WEEK     = 1
+DST_OFFSET       = 1
 
-# ── Alarm ────────────────────────────────────────────────
-ALARM_HOUR     = 7
-ALARM_MINUTE   = 0
-ALARM_ENABLED  = True
-SNOOZE_MINUTES = 9
+# ── PC Agent (run agent_server.py on your laptop) ────────
+AGENT_IP   = "192.168.1.XXX"
+AGENT_PORT = 5001
 
-# Sensory wake-up: sunrise LED begins this many minutes before alarm
-SUNRISE_PRE_ALARM_MINUTES = 10
+# ── Pomodoro ─────────────────────────────────────────────
+POMODORO_WORK_MINUTES  = 25
+POMODORO_BREAK_MINUTES = 5
+POMODORO_AUTO_START_ON_FLIP = True   # start work block when flipped while idle
 
-# Optional: URL to MP3 hosted on TTS server (or None for buzzer)
-ALARM_AUDIO_URL = None   # e.g. "http://192.168.1.42:5001/alarm.mp3"
-
-# ── TTS Server ───────────────────────────────────────────
-TTS_SERVER_IP   = "192.168.1.XXX"   # your computer's local IP
-TTS_SERVER_PORT = 5001
+# ── Flip-to-Track (IMU orientations → task labels) ───────
+# Keys must match imu.py orientation names.
+TASK_BY_ORIENTATION = {
+    "portrait":          "Coding",
+    "landscape_right":   "Email",
+    "portrait_inverted": "Admin",
+    "landscape_left":    "Meetings",
+}
 
 # ── Weather ──────────────────────────────────────────────
 OWM_API_KEY = "YOUR_OPENWEATHERMAP_API_KEY"
 OWM_CITY    = "Indianapolis,US"
-OWM_UNITS   = "imperial"   # "imperial" or "metric"
+OWM_UNITS   = "imperial"
 
 # ── Google Calendar ──────────────────────────────────────
 GCAL_ICS_URL = "https://calendar.google.com/calendar/ical/YOUR_ID/basic.ics"
 
-# ── Radio ────────────────────────────────────────────────
-RADIO_STATION_1_URL  = "http://ice1.somafm.com/groovesalad-128-mp3"
-RADIO_STATION_1_NAME = "Groove Salad"
-RADIO_STATION_2_URL  = "http://ice1.somafm.com/seventies-128-mp3"
-RADIO_STATION_2_NAME = "70s Hits"
+# ── Ticker ───────────────────────────────────────────────
+TICKER_ROTATE_SECONDS = 12   # auto-cycle when idle (0 = manual only via refresh)
 
-# ── Home Assistant / MQTT ────────────────────────────────
+# ── Macro layers (Button A cycles; B/C fire actions) ─────
+# Action strings are sent to agent_server.py — map them there.
+MACRO_LAYERS = [
+    {
+        "name": "Zoom",
+        "b": "zoom_mute_toggle",
+        "c": "zoom_camera_toggle",
+    },
+    {
+        "name": "Media",
+        "b": "media_prev",
+        "c": "media_next",
+    },
+    {
+        "name": "Coding",
+        "b": "code_run_tests",
+        "c": "code_format",
+    },
+]
+
+# ── Display ──────────────────────────────────────────────
+AMBIENT_NIGHT_THRESHOLD = 500
+SCREEN_BRIGHTNESS_DAY   = 100
+SCREEN_BRIGHTNESS_NIGHT = 20
+CIRCADIAN_ENABLED = False   # solid orange/green pomodoro colors read better
+
+# Pomodoro screen colors (RGB565-ish as 0xRRGGBB)
+COLOR_WORK  = 0xFF6600   # bright orange
+COLOR_BREAK = 0x00CC44   # green
+COLOR_IDLE  = 0x111111   # near-black background for ticker
+
+# ── LED status (side NeoPixel bars) ──────────────────────
+LED_BRIGHTNESS_MAX = 80
+LED_COLOR_MIC_HOT     = (255, 0, 0)
+LED_COLOR_RENDER_DONE = (255, 200, 0)
+LED_COLOR_IDLE        = (0, 0, 0)
+
+# ── Voice memos (microSD recommended) ────────────────────
+MEMO_DIR          = "/sd/memos"
+MEMO_SAMPLE_RATE  = 8000
+MEMO_POWER_HOLD_MS = 600    # hold red power button this long to record
+
+# ── Home Assistant / MQTT (optional ticker extras) ───────
 MQTT_ENABLED  = False
-MQTT_BROKER   = "192.168.1.XXX"   # HA server IP
+MQTT_BROKER   = "192.168.1.XXX"
 MQTT_PORT     = 1883
 MQTT_USER     = ""
 MQTT_PASSWORD = ""
-MQTT_CLIENT_ID = "m5stack_clock"
+MQTT_CLIENT_ID = "productive_u"
 
-# Topics to subscribe to (set empty string to disable)
 MQTT_TOPIC_INDOOR_TEMP  = "homeassistant/sensor/indoor_temp/state"
 MQTT_TOPIC_AQI          = "homeassistant/sensor/outdoor_aqi/state"
 MQTT_TOPIC_DOORBELL     = "homeassistant/binary_sensor/doorbell/state"
 MQTT_TOPIC_NEXT_EVENT   = "homeassistant/sensor/next_calendar_event/state"
-
-# ── Display ──────────────────────────────────────────────
-# Ambient light sensor threshold (0-4095, M5Stack Fire built-in ADC)
-# Below this value = night → dim screen
-AMBIENT_NIGHT_THRESHOLD = 500
-SCREEN_BRIGHTNESS_DAY   = 100   # 0-100
-SCREEN_BRIGHTNESS_NIGHT = 20
-
-# Circadian color temperature: warm (orange tint) at night, cool (white) at day
-CIRCADIAN_ENABLED = True
-
-# GIF background file on SD card (None to disable)
-GIF_BACKGROUND = None   # e.g. "/sd/rain_loop.gif"
-
-# ── Chime ────────────────────────────────────────────────
-CHIME_ENABLED      = True
-CHIME_STYLE        = "8bit"   # "8bit" | "westminster" | "ticktock" | "none"
-CHIME_QUIET_START  = 22   # hour: no chimes after this (24h)
-CHIME_QUIET_END    = 7    # hour: chimes resume after this
-
-# ── LED bars ─────────────────────────────────────────────
-LED_BRIGHTNESS_MAX  = 80   # 0-255, cap to avoid blinding yourself
-LED_BREATHE_ENABLED = True
-
-# Weather glow colors (R, G, B)
-LED_COLOR_CLEAR  = (255, 200,  80)   # warm gold
-LED_COLOR_CLOUDY = (180, 180, 220)   # cool grey-blue
-LED_COLOR_RAIN   = ( 30,  80, 255)   # blue
-LED_COLOR_SNOW   = (200, 220, 255)   # ice white
-LED_COLOR_STORM  = (160,   0, 220)   # purple
-LED_COLOR_HOT    = (255,  30,   0)   # red  (>90F / 32C)
-LED_COLOR_COLD   = ( 80, 160, 255)   # light blue (<32F / 0C)
-
-# Sunrise alarm colors (start → end)
-LED_SUNRISE_START = (20,  5,  0)   # deep red ember
-LED_SUNRISE_END   = (255, 160, 40) # warm sunrise orange
